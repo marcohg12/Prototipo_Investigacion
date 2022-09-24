@@ -102,7 +102,7 @@ app.post("/register", checkNotAuthenticated, async (req, res) => {
             user.username = username;
             user.password = hashedPassword;
             await user.save();
-            return res.render("home");
+            return res.render("login");
         } 
         return res.render("register", {name: name, username: username, password: password, err: true});
     } catch {
