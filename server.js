@@ -6,7 +6,9 @@ const flash = require("express-flash");
 const session = require("express-session");
 const User = require("./Models/User");
 const Article = require("./Models/Article"); 
+const UserLike = require("./Models/UserLike"); 
 const bcrypt = require("bcrypt");
+const cors = require('cors')
 
 //Creación y configuración del servidor
 const app = express();
@@ -24,6 +26,14 @@ app.use(session ({
 app.use(passport.initialize());
 app.use(passport.session());
 const initializePassport = require("./passport");
+
+//Configuración de peticiones
+const corsOptions ={
+    origin:'http://localhost:5500', 
+    credentials:true,           
+    optionSuccessStatus:200
+}
+app.use(cors(corsOptions));
 
 //Conexión a Mongo
 mongoose.connect("mongodb://localhost/blogData", {useNewUrlParser : true});
@@ -73,17 +83,141 @@ app.get("/register", checkNotAuthenticated, async (req, res) => {
 
 //Petición de vista del menú principal
 app.get("/home", checkAuthenticated, async (req, res) => {
-    return res.render("home");
+    try {
+        const articles = await Article.find();
+        return res.render("home", {articles: articles});
+    } catch {
+        return res.render("home", {articles: []});
+    }
 });
 
 //Petición de vista de creación de blog
-app.get("/newarticle", checkAuthenticated, async (req, res) => {});
+app.get("/newarticle", checkAuthenticated, async (req, res) => {
+    return res.render("newArticle");
+});
 
-//Petición de vista de edición de blog
-app.get("/editarticle/:id", checkAuthenticated, async (req, res) => {});
+//Petición de vista de artículos de un usuario
+app.get("/userarticles", checkAuthenticated, async (req, res) => {
+    try {
+        const articles = await Article.find({autor: req.user.username});
+        return res.render("userarticles", {articles: articles});
+    } catch {
+        return res.render("userarticles", {articles: []});
+    }
+});
 
-//Petición de vista de blog
-app.get("/viewarticle/:id", checkAuthenticated, async (req, res) => {});
+//Petición de vista de artículos que el usuario ha dado like
+app.get("/userlikes", checkAuthenticated, async (req, res) => {
+    try {
+        const favArticles = await UserLike.findOne({username: req.user.username});
+        const articles = await Article.find({_id: {$in: favArticles.articlesLiked}});
+        return res.render("userLikes", {articles: articles});
+    } catch {
+        return res.render("userLikes", {articles: []});
+    }
+});
+
+//Petición de vista de edición de artículo
+app.get("/editarticle/:id", checkAuthenticated, async (req, res) => {
+    try {
+        const article = await Article.findById(req.params.id);
+        return res.render("editArticle", {title: article.title, description: article.description, content: article.content, articleid: article.id});
+    } catch {
+        return res.redirect("/home");
+    }
+});
+
+//Petición de eliminación de artículo
+app.get("/deletearticle/:id", checkAuthenticated, async (req, res) => {
+    try {
+        await Article.deleteOne({_id: req.params.id});
+        await UserLike.updateMany({},{$pull: {articlesLiked: req.params.id}});
+        await UserLike.updateMany({},{$pull: {dislikes: req.params.id}});
+        return res.redirect("/userarticles");
+    }
+    catch {
+        return res.redirect("/editarticle/" + req.params.id);
+    }
+});
+
+//Estadísticas de vista de un artículo
+app.get("/stats/:id", checkAuthenticated, async (req, res) => {
+
+    const article = await Article.findById(req.params.id);
+    const dates = article.viewDates;
+    var dataPoints = [];
+
+    for (let i = 0; i < dates.length; i++){
+        var date = new Date(dates[i]);
+        date.setHours(0,0,0,0);
+        var index = -1;
+
+        for(let j = 0; j < dataPoints.length; j++) {
+            if(dataPoints[j].x.valueOf() === date.valueOf()) {
+                dataPoints[j].y += 1;
+                index = 0;
+                break;
+            }
+        }
+        if (index == -1){
+            dataPoints.push({x: date, y: 1});
+        } 
+        
+    }
+    return res.render("articleStats", {data: JSON.stringify(dataPoints), articleid: req.params.id});
+});
+
+//Petición de vista de artículo
+app.get("/viewarticle/:id", checkAuthenticated, async (req, res) => {
+    try {
+        const article = await Article.findById(req.params.id);
+        const validation = await UserLike.count({username: req.user.username, articlesLiked: {$in: [req.params.id]}});
+        const validation2 = await UserLike.count({username: req.user.username, dislikes: {$in: [req.params.id]}});
+        const author = await User.findOne({username: article.autor});
+
+        //Si el usuario que visita el artículo no es el autor, se registra una vista
+        if (article.autor != req.user.username){
+            article.views = article.views + 1;
+            article.viewDates.push(new Date().toISOString());
+            await article.save();
+        }
+
+        return res.render("viewArticle", {article: article, amIauthor: article.autor == req.user.username, isLiked: validation == 1, isDisliked: validation2 == 1, author: author.name});
+    } catch {
+        res.redirect("/home");
+    }
+});
+
+//Petición de artículos de un usuario con búsqueda
+app.post("/searchuserarticle", checkAuthenticated, async (req, res) => {
+    try {
+        const articles = await Article.find({autor: req.user.username, title: { $regex: req.body.title + '.*', $options: 'i'}});
+        return res.render("userarticles", {articles: articles, title: req.body.title});
+    } catch {
+        return res.render("userarticles", {articles: [], title: req.body.title});
+    }  
+});
+
+//Petición de artículos con búsqueda
+app.post("/searcharticle", checkAuthenticated, async (req, res) => {
+    try {
+        const articles = await Article.find({title: { $regex: req.body.title + '.*', $options: 'i'}});
+        return res.render("home", {articles: articles, title: req.body.title});
+    } catch {
+        return res.render("home", {articles: [], title: req.body.title});
+    }  
+});
+
+//Petición de artículos con likes con búsqueda
+app.post("/searchfavarticle", checkAuthenticated, async (req, res) => {
+    try {
+        const favArticles = await UserLike.findOne({username: req.user.username});
+        const articles = await Article.find({_id: {$in: favArticles.articlesLiked}, title: { $regex: req.body.title + '.*', $options: 'i'}});
+        return res.render("userLikes", {articles: articles, title: req.body.title});
+    } catch {
+        return res.render("userLikes", {articles: [], title: req.body.title});
+    }  
+});
 
 //Petición de registrar usuario
 app.post("/register", checkNotAuthenticated, async (req, res) => {
@@ -102,11 +236,129 @@ app.post("/register", checkNotAuthenticated, async (req, res) => {
             user.username = username;
             user.password = hashedPassword;
             await user.save();
+            //Creación de lista de likes/dislikes
+            const userLike = new UserLike();
+            userLike.username = username;
+            await userLike.save();
             return res.render("login");
         } 
         return res.render("register", {name: name, username: username, password: password, err: true});
     } catch {
         return res.render("register", {name: name, username: username, password: password});
+    }
+});
+
+//Petición de registrar artículo
+app.post("/newarticle", checkAuthenticated, async (req, res) => {
+    const article = new Article();
+    article.title = req.body.title;
+    article.description = req.body.description;
+    article.content = req.body.content;
+    article.autor = req.user.username;
+    try {
+        await article.save();
+        return res.redirect("/userarticles");
+    } catch {
+        return res.render("newArticle", {title: req.body.title, description: req.body.description, content: req.body.content});
+    }
+});
+
+//Petición de editar artículo
+app.post("/editarticle/:id", checkAuthenticated, async (req, res) => {
+    const article = await Article.findById(req.params.id);
+    article.title = req.body.title;
+    article.description = req.body.description;
+    article.content = req.body.content;
+    article.autor = req.user.username;
+    article.lastEditionDate = Date.now();
+    try {
+        await article.save();
+        return res.redirect("/userarticles");
+    } catch {
+        return res.render("editArticle", {title: req.body.title, description: req.body.description, content: req.body.content});
+    }
+});
+
+//Petición de dar like a un artículo
+app.post("/like/:id", checkAuthenticated, async (req, res) => {
+    try {
+        const validation = await UserLike.count({username: req.user.username, articlesLiked: {$in: [req.params.id]}});
+        const validation2 = await UserLike.count({username: req.user.username, dislikes: {$in: [req.params.id]}});
+
+        //Si el artículo no tenía el like
+        if (validation == 0){
+            const article = await Article.findById(req.params.id);
+            //Si estaba en dislike, se elimina el dislike
+            if (validation2 == 1){
+                article.dislikes = article.dislikes - 1;
+                await UserLike.updateOne(
+                    {username: req.user.username},
+                    { $pull: {dislikes: req.params.id} });   
+                res.status(210);           
+            } else {
+                res.status(200);
+            }
+            //Se agrega el like
+            article.likes = article.likes + 1; 
+            await article.save();
+            await UserLike.updateOne(
+                {username: req.user.username},
+                { $push: {articlesLiked: req.params.id} });
+            
+        } else {
+            const article = await Article.findById(req.params.id);
+            article.likes = article.likes - 1; 
+            await article.save();
+            await UserLike.updateOne(
+                {username: req.user.username},
+                { $pull: {articlesLiked: req.params.id} });
+            res.status(220);
+        }
+        res.send();
+    } catch {
+        res.status(300);
+        res.send();
+    }
+});
+
+//Petición de dar dislike a un artículo
+app.post("/dislike/:id", checkAuthenticated, async (req, res) => {
+    try {
+        const validation = await UserLike.count({username: req.user.username, articlesLiked: {$in: [req.params.id]}});
+        const validation2 = await UserLike.count({username: req.user.username, dislikes: {$in: [req.params.id]}});
+
+        //Si el artículo no tenía el dislike
+        if (validation2 == 0){
+            const article = await Article.findById(req.params.id);
+            //Si el artículo tenía like, se elimina
+            if (validation == 1){
+                article.likes = article.likes - 1;
+                await UserLike.updateOne(
+                    {username: req.user.username},
+                    { $pull: {articlesLiked: req.params.id} });
+                res.status(230);
+            } else {
+                res.status(240);
+            }
+            //Se agrega el dislike
+            article.dislikes = article.dislikes + 1; 
+            await article.save();
+            await UserLike.updateOne(
+                {username: req.user.username},
+                { $push: {dislikes: req.params.id} });
+        } else {
+            const article = await Article.findById(req.params.id);
+            article.dislikes = article.dislikes - 1; 
+            await article.save();
+            await UserLike.updateOne(
+                {username: req.user.username},
+                { $pull: {dislikes: req.params.id} });
+            res.status(250);
+        }
+        res.send();
+    } catch {
+        res.status(300);
+        res.send();
     }
 });
 
@@ -116,6 +368,14 @@ app.post("/home", checkNotAuthenticated, passport.authenticate("local", {
     failureRedirect: "/",
     failureFlash: true
 }));
+
+//Petición de cierre de sesión
+app.post("/logout", checkAuthenticated, async (req, res, next) =>{
+    req.logOut(function(err) {
+        if (err) { return next(err); }
+        else {res.redirect("/");}
+    });
+});
 
 //Configuración de puerto
 app.listen(5500);

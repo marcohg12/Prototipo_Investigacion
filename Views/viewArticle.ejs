@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+
+    <head>
+        <meta charset="UTF-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.1/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-iYQeCzEYFbKjA/T2uDLTpkwGzCiq6soy8tYaI1GyVh/UjpbCx/TYkiZhlZB6+fzT" crossorigin="anonymous">
+        <title>Artículo</title>
+    </head>
+
+    <body>
+      
+      <nav class="navbar navbar-expand-lg" style="background-color: #735d78;">
+        <div class="container">
+          <div class="collapse navbar-collapse" id="navbarButtonsExample" >
+            
+            <ul class="navbar-nav me-auto mb-2 mb-lg-0 ">
+              <li class="nav-item me-4">
+                <a class="nav-link text-white" href="/home">Menú principal</a>
+              </li>
+              <li class="nav-item me-4">
+                <a class="nav-link text-white" href="/newarticle">Crer artículo</a>
+              </li>
+              <li class="nav-item me-4">
+                <a class="nav-link text-white" href="/userarticles">Mis artículos</a>
+              </li>
+              <li class="nav-item me-4">
+                <a class="nav-link text-white" href="/userlikes">Artículos favoritos</a>
+              </li>
+            </ul>
+            
+            <form method="POST" action="/logout">
+              <div class="d-flex align-items-center">
+                <button type="submit" class="btn me-3" style="background-color: #ffd60a;">Cerrar sesión</button>
+              </div>
+            </form>
+          
+          </div>
+        </div>
+      </nav>
+
+      <section class="mt-4">
+        <div class="container">
+            <h1 class="mb-4"><%= article.title %></h1>
+            <div class="text mb-4" id="statData">
+                Likes: <%= article.likes %> &nbsp&nbspDislikes: <%= article.dislikes %> &nbsp&nbspVistas: <%= article.views %>
+            </div>
+            <div class="text mb-4">
+              Autor: <%= author %>
+            </div>
+            <div class="text-muted mb-4">
+              Fecha de creación: <%= article.creationDate.toLocaleDateString() %>
+            </div>
+            <% if (article.lastEditionDate) { %>
+              <div class="text-muted mb-4">
+                Última edición: <%= article.lastEditionDate.toLocaleDateString() %>
+              </div>
+            <% } %>
+
+            <% if (!amIauthor) { %>
+              <% if (isLiked)  { %>
+                <a href="javascript:likeArticle()" class="btn text-white mb-4" style="width:100px; background-color: #ffd60a;" id="likeB">Like</a>
+                <a href="javascript:dislikeArticle()" class="btn btn-danger mb-4" style="width:100px" id="dislikeB">Dislike</a>
+              <% } else if (isDisliked) { %>
+                <a href="javascript:likeArticle()" class="btn text-white mb-4" style="width:100px; background-color: #b392acff;" id="likeB">Like</a>
+                <a href="javascript:dislikeArticle()" class="btn btn-danger mb-4" style="width:100px; background-color: #ffd60a;" id="dislikeB">Dislike</a>
+              <% } else { %>
+                <a href="javascript:likeArticle()" class="btn text-white mb-4" style="width:100px; background-color: #b392acff;" id="likeB">Like</a>
+                <a href="javascript:dislikeArticle()" class="btn btn-danger mb-4" style="width:100px" id="dislikeB">Dislike</a>
+              <% } %> 
+            <% } else { %>
+                <a href="/editarticle/<%=article.id%>" class="btn btn-secondary mb-4" style="width:120px; margin-right: 20px;">Editar</a>
+                <a href="/stats/<%=article.id%>" class="btn btn-secondary mb-4" style="width:120px">Estadísticas</a>
+            <% } %>
+        
+            <div>
+              <%= article.content %>
+            </div>
+          </div>
+        
+      </section>
+
+      <section class="mt-4">
+        <!-- Aquí van los comentarios-->
+      </section>
+
+    </body>
+    <script>
+      const liked = "<%=isLiked%>";
+      const disliked = "<%=isDisliked%>";
+
+      function likeArticle(){
+        const http = new XMLHttpRequest();
+        const url = "http://localhost:5500/like/<%=article.id%>";
+
+        http.onreadystatechange = function() {
+          if (liked == "true") {
+            if (this.readyState == 4 && this.status == 200){
+              const article = JSON.parse('<%-JSON.stringify(article)%>');
+              document.getElementById("statData").innerHTML = `Likes: ${article.likes} &nbsp&nbspDislikes: ${article.dislikes} &nbsp&nbspVistas: ${article.views}`;
+              document.getElementById("likeB").style = "width:100px; background-color: #ffd60a;";
+            } else if (this.readyState == 4 && this.status == 210){
+              const article = JSON.parse('<%-JSON.stringify(article)%>');
+              document.getElementById("statData").innerHTML = `Likes: ${article.likes} &nbsp&nbspDislikes: ${article.dislikes - 1} &nbsp&nbspVistas: ${article.views}`;
+              document.getElementById("likeB").style = "width:100px; background-color: #ffd60a;";
+              document.getElementById("dislikeB").style = "width:100px;";
+            } else if (this.readyState == 4 && this.status == 220){
+                const article = JSON.parse('<%-JSON.stringify(article)%>');
+                document.getElementById("statData").innerHTML = `Likes: ${article.likes - 1} &nbsp&nbspDislikes: ${article.dislikes} &nbsp&nbspVistas: ${article.views}`;
+                document.getElementById("likeB").style = "width:100px; background-color: #b392acff;";
+            }
+          } 
+          
+          else {
+            if (this.readyState == 4 && this.status == 200){
+              const article = JSON.parse('<%-JSON.stringify(article)%>');
+              document.getElementById("statData").innerHTML = `Likes: ${article.likes + 1} &nbsp&nbspDislikes: ${article.dislikes} &nbsp&nbspVistas: ${article.views}`;
+              document.getElementById("likeB").style = "width:100px; background-color: #ffd60a;";
+            } else if (this.readyState == 4 && this.status == 210){
+              const article = JSON.parse('<%-JSON.stringify(article)%>');
+              document.getElementById("statData").innerHTML = `Likes: ${article.likes + 1} &nbsp&nbspDislikes: ${(disliked == "true") ? article.dislikes - 1 : article.dislikes} &nbsp&nbspVistas: ${article.views}`;
+              document.getElementById("likeB").style = "width:100px; background-color: #ffd60a;";
+              document.getElementById("dislikeB").style = "width:100px;";
+            } else if (this.readyState == 4 && this.status == 220){
+                const article = JSON.parse('<%-JSON.stringify(article)%>');
+                document.getElementById("statData").innerHTML = `Likes: ${article.likes} &nbsp&nbspDislikes: ${article.dislikes} &nbsp&nbspVistas: ${article.views}`;
+                document.getElementById("likeB").style = "width:100px; background-color: #b392acff;";
+            }
+          }
+        }
+        http.open("POST", url);
+        http.send();
+      }
+
+      function dislikeArticle(){
+        const http = new XMLHttpRequest();
+        const url = "http://localhost:5500/dislike/<%=article.id%>";
+
+        http.onreadystatechange = function() {
+          if (disliked == "true") {
+            if (this.readyState == 4 && this.status == 230){
+              const article = JSON.parse('<%-JSON.stringify(article)%>');
+              document.getElementById("statData").innerHTML = `Likes: ${article.likes} &nbsp&nbspDislikes: ${article.dislikes} &nbsp&nbspVistas: ${article.views}`;
+              document.getElementById("dislikeB").style = "width:100px; background-color: #ffd60a;";
+              document.getElementById("likeB").style = "width:100px; background-color: #b392acff;";
+            } else if (this.readyState == 4 && this.status == 240){
+              const article = JSON.parse('<%-JSON.stringify(article)%>');
+              document.getElementById("statData").innerHTML = `Likes: ${article.likes} &nbsp&nbspDislikes: ${article.dislikes} &nbsp&nbspVistas: ${article.views}`;
+              document.getElementById("dislikeB").style = "width:100px; background-color: #ffd60a;";
+            } else if (this.readyState == 4 && this.status == 250){
+              const article = JSON.parse('<%-JSON.stringify(article)%>');
+              document.getElementById("statData").innerHTML = `Likes: ${article.likes} &nbsp&nbspDislikes: ${article.dislikes - 1} &nbsp&nbspVistas: ${article.views}`;
+              document.getElementById("dislikeB").style = "width:100px;";
+            }
+          } 
+          
+          else {
+            if (this.readyState == 4 && this.status == 230){
+              const article = JSON.parse('<%-JSON.stringify(article)%>');
+              document.getElementById("statData").innerHTML = `Likes: ${(liked == "true") ? article.likes - 1 : article.likes} &nbsp&nbspDislikes: ${article.dislikes + 1} &nbsp&nbspVistas: ${article.views}`;
+              document.getElementById("dislikeB").style = "width:100px; background-color: #ffd60a;";
+              document.getElementById("likeB").style = "width:100px; background-color: #b392acff;";
+            } else if (this.readyState == 4 && this.status == 240){
+              const article = JSON.parse('<%-JSON.stringify(article)%>');
+              document.getElementById("statData").innerHTML = `Likes: ${article.likes} &nbsp&nbspDislikes: ${article.dislikes + 1} &nbsp&nbspVistas: ${article.views}`;
+              document.getElementById("dislikeB").style = "width:100px; background-color: #ffd60a;";
+            } else if (this.readyState == 4 && this.status == 250){
+              const article = JSON.parse('<%-JSON.stringify(article)%>');
+              document.getElementById("statData").innerHTML = `Likes: ${article.likes} &nbsp&nbspDislikes: ${article.dislikes} &nbsp&nbspVistas: ${article.views}`;
+              document.getElementById("dislikeB").style = "width:100px;";
+            }
+          }
+
+        }
+        http.open("POST", url);
+        http.send();
+      }
+    </script>
+</html>
