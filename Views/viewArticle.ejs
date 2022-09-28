@@ -106,13 +106,17 @@
                 <div class="card-subtitle text-muted mb-2">
                   <%= comment.date.toLocaleDateString()%>
                 </div>
-                <div class="card-subtitle text-muted mb-2">
+                <div class="card-subtitle text-muted mb-2" id="likes/<%=comment.id%>">
                   Likes: <%= comment.likes %> 
                 </div>
                 <div class="card-text mb-2"><%= comment.content %></div>
                 <a href="javascript:viewReplies('<%=comment.id%>')" class="btn" style="background-color: #e8c2caff;">Ver respuestas</a>
                 <a href="javascript:renderReply('<%=comment.id%>')" class="btn" style="background-color: #d1b3c4ff;">Responder</a>
-                <a href="javascript:likeComment('<%=comment.id%>')" class="btn" style="background-color: #b392acff;">Me gusta</a>
+                <% if (comment.isLiked) { %>
+                  <a href="javascript:likeComment('<%=comment.id%>')" class="btn" style="background-color: #ffd60a;" id="like-btn/<%=comment.id%>">Me gusta</a>
+                <% } else { %>
+                  <a href="javascript:likeComment('<%=comment.id%>')" class="btn" style="background-color: #b392acff;" id="like-btn/<%=comment.id%>">Me gusta</a>
+                <% } %>
 
                 <!--Aquí va la caja para escribir una respuesta-->
                 <div id="replybox/<%=comment.id%>">
@@ -243,10 +247,13 @@
         const http = new XMLHttpRequest();
         const url = "http://localhost:5500/getComments/<%=article.id%>";
         http.onreadystatechange = function(){
+          
           if (this.readyState == 4 && this.status == 200){
             var comments = JSON.parse(this.response);
             comments = JSON.parse(comments.comments);
             var html = "";
+
+            //Renderización de los comentarios
             comments.forEach(comment => {
               date = new Date(comment.date).toLocaleDateString();
               html += `
@@ -256,15 +263,20 @@
                     <div class="card-subtitle text-muted mb-2">
                       ${date}
                     </div>
-                    <div class="card-subtitle text-muted mb-2">
+                    <div class="card-subtitle text-muted mb-2" id="likes/${comment._id}">
                       Likes: ${comment.likes}  
                     </div>
                     <div class="card-text mb-2">${comment.content}</div>
                     <a href="javascript:viewReplies('${comment._id}')" class="btn" style="background-color: #e8c2caff;">Ver respuestas</a>
-                    <a href="javascript:renderReply('${comment._id}')" class="btn" style="background-color: #d1b3c4ff;">Responder</a>
-                    <a href="javascript:likeComment('${comment._id}')" class="btn" style="background-color: #b392acff;">Me gusta</a>
+                    <a href="javascript:renderReply('${comment._id}')" class="btn" style="background-color: #d1b3c4ff;">Responder</a>`;
+            
+            if (comment.isLiked){
+              html += `<a href="javascript:likeComment('${comment._id}')" class="btn" style="background-color: #ffd60a;" id="like-btn/${comment._id}">Me gusta</a>`;
+            } else {
+              html += `<a href="javascript:likeComment('${comment._id}')" class="btn" style="background-color: #b392acff;" id="like-btn/${comment._id}">Me gusta</a>`;
+            }
                     
-                    <div id="replybox/${comment._id}">
+            html += `<div id="replybox/${comment._id}">
                     </div>
 
                     <div class="container mt-4" id="viewreplies/${comment._id}">
@@ -305,6 +317,7 @@
         const comment = document.getElementById("replycomment/" + commentid).value;
         const http = new XMLHttpRequest();
         const url = "http://localhost:5500/replycomment/" + commentid;
+
         http.onreadystatechange = function(){
           if (this.readyState == 4 && this.status == 200){
             document.getElementById("replycomment/" + commentid).value = "";
@@ -327,11 +340,15 @@
 
         const http = new XMLHttpRequest();
         const url = "http://localhost:5500/getCommentReplies/" + commentid;
+
         http.onreadystatechange = function(){
           if (this.readyState == 4 && this.status == 200){
+
             var comments = JSON.parse(this.response);
             comments = JSON.parse(comments.comments);
             var html = `<a href="javascript:cancelView('${commentid}')" class="btn btn-danger mt-3"">Ocultar respuestas</a>`;
+
+            //Renderización de las respuestas de un comentario
             comments.forEach(comment => {
               date = new Date(comment.date).toLocaleDateString();
               html += ` <div class="card mt-4" style="width:650px">
@@ -340,14 +357,19 @@
                     <div class="card-subtitle text-muted mb-2">
                       ${date}
                     </div>
-                    <div class="card-subtitle text-muted mb-2">
+                    <div class="card-subtitle text-muted mb-2" id="likes/${comment._id}">
                       Likes: ${comment.likes}  
                     </div>
                     <div class="card-text mb-2">Respondiendo a ${comment.author} ${comment.content}</div>
-                    <a href="javascript:renderReply('${comment._id}')" class="btn" style="background-color: #d1b3c4ff;">Responder</a>
-                    <a href="javascript:likeComment('${comment._id}')" class="btn" style="background-color: #b392acff;">Me gusta</a>
+                    <a href="javascript:renderReply('${comment._id}')" class="btn me-2" style="background-color: #d1b3c4ff;">Responder</a>`;
+              
+              if (comment.isLiked){
+                html += `<a href="javascript:likeComment('${comment._id}')" class="btn" style="background-color: #ffd60a;" id="like-btn/${comment._id}">Me gusta</a>`;
+              } else {
+                html += `<a href="javascript:likeComment('${comment._id}')" class="btn" style="background-color: #b392acff;" id="like-btn/${comment._id}">Me gusta</a>`;
+              }
                     
-                    <div id="replybox/${comment._id}">
+              html += `<div id="replybox/${comment._id}">
                     </div>
 
                   </div>
@@ -358,6 +380,30 @@
           }
         }
         http.open("GET", url);
+        http.send();
+      }
+
+      //Da o quita el like a un comentario
+      function likeComment(commentid){
+        const http = new XMLHttpRequest();
+        const url = "http://localhost:5500/likecomment/" + commentid;
+        http.onreadystatechange = function(){
+
+          //Se le da el like al comentario
+          if (this.readyState == 4 && this.status == 200){
+            const likes = JSON.parse(this.response);
+            document.getElementById("likes/" + commentid).innerHTML = "Likes: " + likes.likes;
+            document.getElementById("like-btn/" + commentid).style = "background-color: #ffd60a;";
+          } 
+          
+          //Se le quita el like al comentario
+          else if (this.readyState == 4 && this.status == 210){
+            const likes = JSON.parse(this.response);
+            document.getElementById("likes/" + commentid).innerHTML = "Likes: " + likes.likes;
+            document.getElementById("like-btn/" + commentid).style = "background-color: #b392acff;";
+          }
+        }
+        http.open("POST", url);
         http.send();
       }
 

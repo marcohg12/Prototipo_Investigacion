@@ -100,8 +100,16 @@ app.get("/home", checkAuthenticated, async (req, res) => {
 //Petición de los comentarios de un artículo
 app.get("/getComments/:id", checkAuthenticated, async (req, res) => {
     const comments = await Comment.find({article: req.params.id, respondingTo: null}).sort({date: "desc"});
+    const newComments = [];
+    for (let i = 0; i < comments.length; i++){
+        var comment = comments[i].toObject();
+        if (comment.usersThatLiked.includes(req.user.username)){
+            comment.isLiked = true;
+        }
+        newComments.push(comment);
+    }
     res.status(200); 
-    res.send({comments: JSON.stringify(comments)});
+    res.send({comments: JSON.stringify(newComments)});
 });
 
 
@@ -111,6 +119,9 @@ app.get("/getCommentReplies/:id", checkAuthenticated, async (req, res) => {
     const newComments = [];
     for (let i = 0; i < comments.length; i++){
         var comment = comments[i].toObject();
+        if (comment.usersThatLiked.includes(req.user.username)){
+            comment.isLiked = true;
+        }
         const comm = await Comment.findById(comment.respondingTo);
         comment.author = comm.username;
         newComments.push(comment);
@@ -204,14 +215,6 @@ app.get("/viewarticle/:id", checkAuthenticated, async (req, res) => {
         const validation2 = await UserLike.count({username: req.user.username, dislikes: {$in: [req.params.id]}});
         const author = await User.findOne({username: article.autor});
         const comments = await Comment.find({article: req.params.id, respondingTo: null}).sort({date: "desc"});
-        comments.sort(function (a, b) {
-            if (new Date(b.date) > new Date(a.date)) {
-                return 1
-            } if (new Date(b.date) < new Date(a.date)) {
-                return -1
-            }
-            return 0;
-        });
 
         //Si el usuario que visita el artículo no es el autor, se registra una vista
         if (article.autor != req.user.username){
@@ -220,7 +223,17 @@ app.get("/viewarticle/:id", checkAuthenticated, async (req, res) => {
             await article.save();
         }
 
-        return res.render("viewArticle", {article: article, comments: comments, amIauthor: article.autor == req.user.username, isLiked: validation == 1, isDisliked: validation2 == 1, author: author.name});
+        const newComments = [];
+        for (let i = 0; i < comments.length; i++){
+            var comment = comments[i].toObject();
+            if (comment.usersThatLiked.includes(req.user.username)){
+                comment.isLiked = true;
+            }
+            comment.id = comment._id;
+            newComments.push(comment);
+        }
+
+        return res.render("viewArticle", {article: article, comments: newComments, amIauthor: article.autor == req.user.username, isLiked: validation == 1, isDisliked: validation2 == 1, author: author.name});
     } catch {
         res.redirect("/home");
     }
@@ -439,6 +452,27 @@ app.post("/replycomment/:id", checkAuthenticated, async (req, res) => {
         await comment.save();
         res.status(200);
         res.send(rootCommentid);
+    } catch {
+        res.status(400);
+        res.send();
+    }
+});
+
+//Petición de dar o quitar like a un comentario
+app.post("/likecomment/:id", checkAuthenticated, async (req, res) => {
+    try {
+        const isLiked = await Comment.findOne({_id: req.params.id, usersThatLiked: {$in: [req.user.username]} });
+        //Se verifica si el usuario ya ha dado like al comentario
+        if (isLiked){
+            //Si tiene el like, se le quita
+            await Comment.updateOne({_id: req.params.id}, {$pull: {usersThatLiked: req.user.username}, $inc: {likes: -1}});
+            res.status(210);
+        } else{
+            await Comment.updateOne({_id: req.params.id}, {$push: {usersThatLiked: req.user.username}, $inc: {likes: 1}});
+            res.status(200);
+        }
+        const result = await Comment.findById(req.params.id);
+        res.send(JSON.stringify({likes: result.likes}));
     } catch {
         res.status(400);
         res.send();
