@@ -81,39 +81,50 @@
         
       </section>
 
+      <!-- Aquí va el cuadro para publicar un comentario-->
       <section class="mt-4">
-        <!-- Aquí van los comentarios-->
         <div class="container">
           <div class="card my-4" style="width:750px">
             <h5 class="card-header">Deja tu comentario:</h5>
             <div class="card-body">
-              <form method="post">
-                <input type="hidden">
                 <div class="form-group">
-                  <textarea class="form-control" name="comment" placeholder="Comentario" rows="3"></textarea>
+                  <textarea class="form-control" id="comment" placeholder="Comentario" rows="3"></textarea>
                 </div>
-                <button type="submit" class="btn me-3 mt-3" style="background-color: #ffd60a;">Enviar</button>
-              </form>
+                <a href="javascript:sendComment()" class="btn me-3 mt-3" style="background-color: #ffd60a;">Enviar</a>
             </div>
           </div>
         </div>
+      </section>
 
-        <div class="container">
-          <div class="media">
-            <div class="media-body">
-              <h5 class="mt-0">username<!-- Aquí va el username del post que se hizo--></h5>
-                postanterior<!-- Aquí va el post que se hizo--> 
+      <!-- Aquí van los comentarios-->
+      <section class="mt-4 mb-4">
+        <div class="container" id="commentcontainer">
+          <% comments.forEach(comment => { %>
+            <div class="card mt-4" style="width:750px">
+              <div class="card-body">
+                <h5 class="card-title"><%= comment.username %></h5>
+                <div class="card-subtitle text-muted mb-2">
+                  <%= comment.date.toLocaleDateString()%>
+                </div>
+                <div class="card-subtitle text-muted mb-2">
+                  Likes: <%= comment.likes %> 
+                </div>
+                <div class="card-text mb-2"><%= comment.content %></div>
+                <a href="javascript:viewReplies('<%=comment.id%>')" class="btn" style="background-color: #e8c2caff;">Ver respuestas</a>
+                <a href="javascript:renderReply('<%=comment.id%>')" class="btn" style="background-color: #d1b3c4ff;">Responder</a>
+                <a href="javascript:likeComment('<%=comment.id%>')" class="btn" style="background-color: #b392acff;">Me gusta</a>
 
-              <div class="col-md-3"></div>         
-                  <form>
-                    <div class="form-group" style="width:450px">
-                        <textarea class="form-control" name="comment" placeholder="Responder comentario" rows="3"></textarea>
-                    </div>
-                    <button type="submit" class="btn btn-info btn-sm" style="background-color: #ffd60a;">Responder</button>
-                  </form>
+                <!--Aquí va la caja para escribir una respuesta-->
+                <div id="replybox/<%=comment.id%>">
+                </div>
+
+                <!--Aquí va la caja de respuestas del comentario-->
+                <div class="container mt-4" id="viewreplies/<%=comment.id%>">
+                </div>
+                
               </div>
             </div>
-          </div>
+          <% }) %>
         </div>
       </section>
 
@@ -122,6 +133,7 @@
       const liked = "<%=isLiked%>";
       const disliked = "<%=isDisliked%>";
 
+      //Función para dar like a un comentario
       function likeArticle(){
         const http = new XMLHttpRequest();
         const url = "http://localhost:5500/like/<%=article.id%>";
@@ -165,6 +177,7 @@
         http.send();
       }
 
+      //Función para dar dislike a un comentario
       function dislikeArticle(){
         const http = new XMLHttpRequest();
         const url = "http://localhost:5500/dislike/<%=article.id%>";
@@ -208,5 +221,145 @@
         http.open("POST", url);
         http.send();
       }
+
+      //Envía un comentario
+      function sendComment(){
+        const comment = document.getElementById("comment").value;
+        const http = new XMLHttpRequest();
+        const url = "http://localhost:5500/sendcomment/<%=article.id%>";
+        http.onreadystatechange = function(){
+          if (this.readyState == 4 && this.status == 200){
+            document.getElementById("comment").value = "";
+            refresComments();
+          }
+        }
+        http.open("POST", url);
+        http.setRequestHeader("Content-Type", "application/json;charset=UTF-8");
+        http.send(JSON.stringify({comment: comment}));
+      }
+
+      //Refresca el área general de comentarios
+      function refresComments(){
+        const http = new XMLHttpRequest();
+        const url = "http://localhost:5500/getComments/<%=article.id%>";
+        http.onreadystatechange = function(){
+          if (this.readyState == 4 && this.status == 200){
+            var comments = JSON.parse(this.response);
+            comments = JSON.parse(comments.comments);
+            var html = "";
+            comments.forEach(comment => {
+              date = new Date(comment.date).toLocaleDateString();
+              html += `
+                <div class="card mt-4" style="width:750px">
+                  <div class="card-body">
+                    <h5 class="card-title">${comment.username}</h5>
+                    <div class="card-subtitle text-muted mb-2">
+                      ${date}
+                    </div>
+                    <div class="card-subtitle text-muted mb-2">
+                      Likes: ${comment.likes}  
+                    </div>
+                    <div class="card-text mb-2">${comment.content}</div>
+                    <a href="javascript:viewReplies('${comment._id}')" class="btn" style="background-color: #e8c2caff;">Ver respuestas</a>
+                    <a href="javascript:renderReply('${comment._id}')" class="btn" style="background-color: #d1b3c4ff;">Responder</a>
+                    <a href="javascript:likeComment('${comment._id}')" class="btn" style="background-color: #b392acff;">Me gusta</a>
+                    
+                    <div id="replybox/${comment._id}">
+                    </div>
+
+                    <div class="container mt-4" id="viewreplies/${comment._id}">
+                    </div>
+
+                  </div>
+                </div>`;
+            });
+            document.getElementById("commentcontainer").innerHTML = html;
+          }
+        }
+        http.open("GET", url);
+        http.send();
+      }
+
+      //Función para cancelar el cuadro de responder un comentario
+      function cancelReply(commentid){
+        document.getElementById("replybox/" + commentid).innerHTML = "";
+      }
+
+      //Despliega el recuadro para responder un comentario
+      function renderReply(commentid){
+        document.getElementById("replybox/" + commentid).innerHTML = `
+        <div class="card my-4" style="width:600px">
+          <h5 class="card-header">Deja tu respuesta:</h5>
+          <div class="card-body">
+            <div class="form-group">
+              <textarea class="form-control" id="replycomment/${commentid}" placeholder="Comentario" rows="3"></textarea>
+            </div>
+            <a href="javascript:sendReply('${commentid}', '<%=article.id%>')" class="btn mt-3" style="background-color: #ffd60a;">Enviar</a>
+            <a href="javascript:cancelReply('${commentid}')" class="btn btn-danger mt-3"">Cancelar</a>
+          </div>
+        </div>`;
+      }
+
+      //Envía la respuesta a un comentario
+      function sendReply(commentid, articleid){
+        const comment = document.getElementById("replycomment/" + commentid).value;
+        const http = new XMLHttpRequest();
+        const url = "http://localhost:5500/replycomment/" + commentid;
+        http.onreadystatechange = function(){
+          if (this.readyState == 4 && this.status == 200){
+            document.getElementById("replycomment/" + commentid).value = "";
+            const rootCommentid = this.response;
+            viewReplies(rootCommentid);
+          }
+        }
+        http.open("POST", url);
+        http.setRequestHeader("Content-Type", "application/json;charset=UTF-8");
+        http.send(JSON.stringify({comment: comment, articleid: articleid}));
+      }
+
+      //Quita la vista de las respuestas de un comentario
+      function cancelView(commentid){
+        document.getElementById("viewreplies/" + commentid).innerHTML = "";
+      }
+
+      //Muestra los comentarios de un comentario raíz
+      function viewReplies(commentid){
+
+        const http = new XMLHttpRequest();
+        const url = "http://localhost:5500/getCommentReplies/" + commentid;
+        http.onreadystatechange = function(){
+          if (this.readyState == 4 && this.status == 200){
+            var comments = JSON.parse(this.response);
+            comments = JSON.parse(comments.comments);
+            var html = `<a href="javascript:cancelView('${commentid}')" class="btn btn-danger mt-3"">Ocultar respuestas</a>`;
+            comments.forEach(comment => {
+              date = new Date(comment.date).toLocaleDateString();
+              html += ` <div class="card mt-4" style="width:650px">
+                  <div class="card-body">
+                    <h5 class="card-title">${comment.username}</h5>
+                    <div class="card-subtitle text-muted mb-2">
+                      ${date}
+                    </div>
+                    <div class="card-subtitle text-muted mb-2">
+                      Likes: ${comment.likes}  
+                    </div>
+                    <div class="card-text mb-2">Respondiendo a ${comment.author} ${comment.content}</div>
+                    <a href="javascript:renderReply('${comment._id}')" class="btn" style="background-color: #d1b3c4ff;">Responder</a>
+                    <a href="javascript:likeComment('${comment._id}')" class="btn" style="background-color: #b392acff;">Me gusta</a>
+                    
+                    <div id="replybox/${comment._id}">
+                    </div>
+
+                  </div>
+                </div>`;
+            });
+
+            document.getElementById("viewreplies/" + commentid).innerHTML = html;
+          }
+        }
+        http.open("GET", url);
+        http.send();
+      }
+
     </script>
 </html>
