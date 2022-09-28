@@ -7,14 +7,20 @@ const session = require("express-session");
 const User = require("./Models/User");
 const Article = require("./Models/Article"); 
 const UserLike = require("./Models/UserLike"); 
+const Comment = require("./Models/Comment"); 
 const bcrypt = require("bcrypt");
 const cors = require('cors')
+const bodyParser = require("body-parser");
 
 //Creación y configuración del servidor
 const app = express();
 app.set("view engine", "ejs");
 app.use(express.urlencoded({extended: false}));
 app.use(express.static(__dirname));
+app.use(bodyParser.urlencoded({
+    extended: true
+}));
+app.use(bodyParser.json());
 
 //Configuración de sesión de usuario
 app.use(flash());
@@ -91,6 +97,28 @@ app.get("/home", checkAuthenticated, async (req, res) => {
     }
 });
 
+//Petición de los comentarios de un artículo
+app.get("/getComments/:id", checkAuthenticated, async (req, res) => {
+    const comments = await Comment.find({article: req.params.id, respondingTo: null}).sort({date: "desc"});
+    res.status(200); 
+    res.send({comments: JSON.stringify(comments)});
+});
+
+
+//Petición de las respuestas de un comentario
+app.get("/getCommentReplies/:id", checkAuthenticated, async (req, res) => {
+    const comments = await Comment.find({rootComment: req.params.id}).sort({date: "desc"});
+    const newComments = [];
+    for (let i = 0; i < comments.length; i++){
+        var comment = comments[i].toObject();
+        const comm = await Comment.findById(comment.respondingTo);
+        comment.author = comm.username;
+        newComments.push(comment);
+    }
+    res.status(200);
+    res.send({comments: JSON.stringify(newComments)});
+});
+
 //Petición de vista de creación de blog
 app.get("/newarticle", checkAuthenticated, async (req, res) => {
     return res.render("newArticle");
@@ -133,6 +161,7 @@ app.get("/deletearticle/:id", checkAuthenticated, async (req, res) => {
         await Article.deleteOne({_id: req.params.id});
         await UserLike.updateMany({},{$pull: {articlesLiked: req.params.id}});
         await UserLike.updateMany({},{$pull: {dislikes: req.params.id}});
+        await Comment.deleteMany({article: req.params.id});
         return res.redirect("/userarticles");
     }
     catch {
@@ -174,6 +203,15 @@ app.get("/viewarticle/:id", checkAuthenticated, async (req, res) => {
         const validation = await UserLike.count({username: req.user.username, articlesLiked: {$in: [req.params.id]}});
         const validation2 = await UserLike.count({username: req.user.username, dislikes: {$in: [req.params.id]}});
         const author = await User.findOne({username: article.autor});
+        const comments = await Comment.find({article: req.params.id, respondingTo: null}).sort({date: "desc"});
+        comments.sort(function (a, b) {
+            if (new Date(b.date) > new Date(a.date)) {
+                return 1
+            } if (new Date(b.date) < new Date(a.date)) {
+                return -1
+            }
+            return 0;
+        });
 
         //Si el usuario que visita el artículo no es el autor, se registra una vista
         if (article.autor != req.user.username){
@@ -182,7 +220,7 @@ app.get("/viewarticle/:id", checkAuthenticated, async (req, res) => {
             await article.save();
         }
 
-        return res.render("viewArticle", {article: article, amIauthor: article.autor == req.user.username, isLiked: validation == 1, isDisliked: validation2 == 1, author: author.name});
+        return res.render("viewArticle", {article: article, comments: comments, amIauthor: article.autor == req.user.username, isLiked: validation == 1, isDisliked: validation2 == 1, author: author.name});
     } catch {
         res.redirect("/home");
     }
@@ -358,6 +396,51 @@ app.post("/dislike/:id", checkAuthenticated, async (req, res) => {
         res.send();
     } catch {
         res.status(300);
+        res.send();
+    }
+});
+
+//Petición de enviar un comentario en un artículo
+app.post("/sendcomment/:id", checkAuthenticated, async (req, res) => {
+    try {
+        const comment = new Comment();
+        comment.article = req.params.id;
+        comment.username = req.user.username;
+        comment.content = req.body.comment;
+        await comment.save();
+        res.status(200);
+        res.send();
+    } catch {
+        res.status(400);
+        res.send();
+    }
+});
+
+//Petición de responder un comentario
+app.post("/replycomment/:id", checkAuthenticated, async (req, res) => {
+    try {
+        const comment = new Comment();
+        comment.article = req.body.articleid;
+        comment.respondingTo = req.params.id;
+        comment.username = req.user.username;
+        comment.content = req.body.comment;
+
+        var rootCommentid = null;
+        var commentid = req.params.id;
+        while (rootCommentid == null){
+            const comment = await Comment.findById(commentid);
+            if (comment.respondingTo == null){
+                rootCommentid = comment.id;
+            } else {
+                commentid = comment.respondingTo;
+            }
+        }
+        comment.rootComment = rootCommentid;
+        await comment.save();
+        res.status(200);
+        res.send(rootCommentid);
+    } catch {
+        res.status(400);
         res.send();
     }
 });

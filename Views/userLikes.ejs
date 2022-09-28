@@ -66,7 +66,7 @@
         </div>
       </section>
       
-      <section class="mt-4" id="content">
+      <section class="mt-4 mb-4" id="content">
         <div class="container">
             <% articles.forEach(article => { %>
               <div class="card mt-4">
@@ -176,8 +176,7 @@
                             <div class="card-subtitle text-muted mb-2">
                                 Likes: ${article.likes} &nbsp&nbspDislikes: ${article.dislikes} &nbsp&nbspVistas: ${article.views}
                             </div>
-                            <a href="articles/${article.id}" class="btn" style="background-color: #d1b3c4ff;">Ver más</a>
-                            <a href="articles/edit/${article.id}" class="btn" style="background-color: #b392acff;">Editar</a>
+                            <a href="/viewarticle/${article._id}" class="btn" style="background-color: #d1b3c4ff;">Ver más</a>
                         </div>
                     </div> `;
             });
