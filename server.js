@@ -106,6 +106,9 @@ app.get("/getComments/:id", checkAuthenticated, async (req, res) => {
         if (comment.usersThatLiked.includes(req.user.username)){
             comment.isLiked = true;
         }
+        if (comment.username == req.user.username){
+            comment.amIauthor = true;
+        }
         newComments.push(comment);
     }
     res.status(200); 
@@ -121,6 +124,9 @@ app.get("/getCommentReplies/:id", checkAuthenticated, async (req, res) => {
         var comment = comments[i].toObject();
         if (comment.usersThatLiked.includes(req.user.username)){
             comment.isLiked = true;
+        }
+        if (comment.username == req.user.username){
+            comment.amIauthor = true;
         }
         const comm = await Comment.findById(comment.respondingTo);
         comment.author = comm.username;
@@ -228,6 +234,9 @@ app.get("/viewarticle/:id", checkAuthenticated, async (req, res) => {
             var comment = comments[i].toObject();
             if (comment.usersThatLiked.includes(req.user.username)){
                 comment.isLiked = true;
+            }
+            if (comment.username == req.user.username){
+                comment.amIauthor = true;
             }
             comment.id = comment._id;
             newComments.push(comment);
@@ -473,6 +482,48 @@ app.post("/likecomment/:id", checkAuthenticated, async (req, res) => {
         }
         const result = await Comment.findById(req.params.id);
         res.send(JSON.stringify({likes: result.likes}));
+    } catch {
+        res.status(400);
+        res.send();
+    }
+});
+
+//Petición de editar un comentario
+app.post("/editComment/:id", checkAuthenticated, async (req, res) => {
+    try {
+        const comment = await Comment.findById(req.params.id);
+        comment.isEdited = true;
+        comment.content = req.body.newcomment;
+        await comment.save();
+
+        var isRoot = false;
+        if (comment.respondingTo == null){
+            isRoot = true;
+        }
+
+        res.status(200);
+        res.send(JSON.stringify({isRoot: isRoot, rootComment: comment.rootComment}));
+    } catch (err) {
+        console.log(err)
+        res.status(400);
+        res.send();
+    }
+});
+
+//Petición de eliminar un comentario
+app.post("/deleteComment/:id", checkAuthenticated, async (req, res) => {
+    try {
+        const comment = await Comment.findById(req.params.id);
+        comment.isDeleted = true;
+        await comment.save();
+
+        var isRoot = false;
+        if (comment.respondingTo == null){
+            isRoot = true;
+        }
+
+        res.status(200);
+        res.send(JSON.stringify({isRoot: isRoot, rootComment: comment.rootComment}));
     } catch {
         res.status(400);
         res.send();

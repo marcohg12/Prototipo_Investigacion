@@ -10,6 +10,7 @@ const Comment = new mongoose.Schema({
     date: {type: Date, default: Date.now()},
     likes: {type: Number, default: 0},
     isDeleted: {type: Boolean, default: false},
+    isEdited: {type: Boolean, default: false},
     usersThatLiked: {type: Array, default: []}
 });
 

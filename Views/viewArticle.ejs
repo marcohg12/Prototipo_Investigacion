@@ -105,21 +105,40 @@
                 <h5 class="card-title"><%= comment.username %></h5>
                 <div class="card-subtitle text-muted mb-2">
                   <%= comment.date.toLocaleDateString()%>
+                  <% if (comment.isEdited) { %>
+                    Editado
+                  <% } %>
                 </div>
                 <div class="card-subtitle text-muted mb-2" id="likes/<%=comment.id%>">
                   Likes: <%= comment.likes %> 
                 </div>
-                <div class="card-text mb-2"><%= comment.content %></div>
+                <div class="card-text mb-2" id="content/<%=comment.id%>">
+                  <% if (comment.isDeleted) { %>
+                    Este comentario ha sido eliminado por su autor
+                  <% } else { %>
+                    <%=comment.content%>
+                  <% } %>
+                </div>
                 <a href="javascript:viewReplies('<%=comment.id%>')" class="btn" style="background-color: #e8c2caff;">Ver respuestas</a>
-                <a href="javascript:renderReply('<%=comment.id%>')" class="btn" style="background-color: #d1b3c4ff;">Responder</a>
-                <% if (comment.isLiked) { %>
+                <% if (!comment.isDeleted) { %>
+                  <a href="javascript:renderReply('<%=comment.id%>')" class="btn" style="background-color: #d1b3c4ff;">Responder</a>
+                <% } %>
+                <% if (comment.isLiked && !comment.isDeleted) { %>
                   <a href="javascript:likeComment('<%=comment.id%>')" class="btn" style="background-color: #ffd60a;" id="like-btn/<%=comment.id%>">Me gusta</a>
-                <% } else { %>
+                <% } else if (!comment.isLiked && !comment.isDeleted){ %>
                   <a href="javascript:likeComment('<%=comment.id%>')" class="btn" style="background-color: #b392acff;" id="like-btn/<%=comment.id%>">Me gusta</a>
+                <% } %>
+                <% if (comment.amIauthor && !comment.isDeleted) { %>
+                  <a href="javascript:renderEdit('<%=comment.id%>')" class="link-secondary me-2" style="margin-left:200px;">Editar</a>
+                  <a href="javascript:deleteComment('<%=comment.id%>')" class="link-danger">Eliminar</a>
                 <% } %>
 
                 <!--Aquí va la caja para escribir una respuesta-->
                 <div id="replybox/<%=comment.id%>">
+                </div>
+
+                 <!--Aquí va la caja para editar un comentario-->
+                <div id="editbox/<%=comment.id%>">
                 </div>
 
                 <!--Aquí va la caja de respuestas del comentario-->
@@ -261,22 +280,31 @@
                   <div class="card-body">
                     <h5 class="card-title">${comment.username}</h5>
                     <div class="card-subtitle text-muted mb-2">
-                      ${date}
+                      ${date} ${comment.isEdited ? "Editado": ""}
                     </div>
                     <div class="card-subtitle text-muted mb-2" id="likes/${comment._id}">
                       Likes: ${comment.likes}  
                     </div>
-                    <div class="card-text mb-2">${comment.content}</div>
-                    <a href="javascript:viewReplies('${comment._id}')" class="btn" style="background-color: #e8c2caff;">Ver respuestas</a>
-                    <a href="javascript:renderReply('${comment._id}')" class="btn" style="background-color: #d1b3c4ff;">Responder</a>`;
+                    <div class="card-text mb-2" id="content/${comment._id}">${comment.isDeleted ? "Este comentario ha sido eliminado por su autor" : comment.content}</div>
+                    <a href="javascript:viewReplies('${comment._id}')" class="btn" style="background-color: #e8c2caff;">Ver respuestas</a>`;
             
-            if (comment.isLiked){
-              html += `<a href="javascript:likeComment('${comment._id}')" class="btn" style="background-color: #ffd60a;" id="like-btn/${comment._id}">Me gusta</a>`;
-            } else {
-              html += `<a href="javascript:likeComment('${comment._id}')" class="btn" style="background-color: #b392acff;" id="like-btn/${comment._id}">Me gusta</a>`;
+            if (!comment.isDeleted){
+              html += `<a href="javascript:renderReply('${comment._id}')" class="btn" style="background-color: #d1b3c4ff;">Responder</a>\n`;
+            }
+            if (comment.isLiked && !comment.isDeleted){
+              html += `<a href="javascript:likeComment('${comment._id}')" class="btn" style="background-color: #ffd60a;" id="like-btn/${comment._id}">Me gusta</a>\n`;
+            } else if (!comment.isLiked && !comment.isDeleted) {
+              html += `<a href="javascript:likeComment('${comment._id}')" class="btn" style="background-color: #b392acff;" id="like-btn/${comment._id}">Me gusta</a>\n`;
+            }
+            if (comment.amIauthor && !comment.isDeleted){
+              html += `<a href="javascript:renderEdit('${comment._id}')" class="link-secondary me-2" style="margin-left:200px;">Editar</a>
+                       <a href="javascript:deleteComment('${comment._id}')" class="link-danger">Eliminar</a>`;
             }
                     
-            html += `<div id="replybox/${comment._id}">
+            html += `<div id="editbox/${comment._id}">
+                    </div>
+                    
+                    <div id="replybox/${comment._id}">
                     </div>
 
                     <div class="container mt-4" id="viewreplies/${comment._id}">
@@ -292,13 +320,9 @@
         http.send();
       }
 
-      //Función para cancelar el cuadro de responder un comentario
-      function cancelReply(commentid){
-        document.getElementById("replybox/" + commentid).innerHTML = "";
-      }
-
       //Despliega el recuadro para responder un comentario
       function renderReply(commentid){
+        document.getElementById("editbox/" + commentid).innerHTML = "";
         document.getElementById("replybox/" + commentid).innerHTML = `
         <div class="card my-4" style="width:600px">
           <h5 class="card-header">Deja tu respuesta:</h5>
@@ -307,10 +331,45 @@
               <textarea class="form-control" id="replycomment/${commentid}" placeholder="Comentario" rows="3"></textarea>
             </div>
             <a href="javascript:sendReply('${commentid}', '<%=article.id%>')" class="btn mt-3" style="background-color: #ffd60a;">Enviar</a>
-            <a href="javascript:cancelReply('${commentid}')" class="btn btn-danger mt-3"">Cancelar</a>
+            <a href="javascript:cancelReply('${commentid}')" class="btn btn-danger mt-3">Cancelar</a>
           </div>
         </div>`;
       }
+
+      //Despliega el recuadro para editar un comentario
+      function renderEdit(commentid){
+        const ogComment = document.getElementById("content/" + commentid).innerHTML;
+        document.getElementById("replybox/" + commentid).innerHTML = "";
+        document.getElementById("editbox/" + commentid).innerHTML = `
+        <div class="card my-4" style="width:600px">
+          <h5 class="card-header">Editar respuesta:</h5>
+          <div class="card-body">
+            <div class="form-group">
+              <textarea class="form-control" id="editcomment/${commentid}" placeholder="Nuevo comentario" rows="3">${ogComment}</textarea>
+            </div>
+            <a href="javascript:sendEdit('${commentid}', '<%=article.id%>')" class="btn mt-3" style="background-color: #ffd60a;">Guardar</a>
+            <a href="javascript:cancelEdit('${commentid}')" class="btn btn-danger mt-3"">Cancelar</a>
+          </div>
+        </div>`;
+
+      }
+
+      //Quita la vista de las respuestas de un comentario
+      function cancelView(commentid){
+        document.getElementById("viewreplies/" + commentid).innerHTML = "";
+      }
+
+      //Función para cancelar el cuadro de responder un comentario
+        function cancelReply(commentid){
+        document.getElementById("replybox/" + commentid).innerHTML = "";
+      }
+
+      //Función para cancelar el cuadro de responder un comentario
+        function cancelEdit(commentid){
+        document.getElementById("editbox/" + commentid).innerHTML = "";
+      }
+
+
 
       //Envía la respuesta a un comentario
       function sendReply(commentid, articleid){
@@ -320,7 +379,7 @@
 
         http.onreadystatechange = function(){
           if (this.readyState == 4 && this.status == 200){
-            document.getElementById("replycomment/" + commentid).value = "";
+            cancelReply(commentid);
             const rootCommentid = this.response;
             viewReplies(rootCommentid);
           }
@@ -328,11 +387,6 @@
         http.open("POST", url);
         http.setRequestHeader("Content-Type", "application/json;charset=UTF-8");
         http.send(JSON.stringify({comment: comment, articleid: articleid}));
-      }
-
-      //Quita la vista de las respuestas de un comentario
-      function cancelView(commentid){
-        document.getElementById("viewreplies/" + commentid).innerHTML = "";
       }
 
       //Muestra los comentarios de un comentario raíz
@@ -355,22 +409,31 @@
                   <div class="card-body">
                     <h5 class="card-title">${comment.username}</h5>
                     <div class="card-subtitle text-muted mb-2">
-                      ${date}
+                      ${date} ${comment.isEdited ? "Editado": ""}
                     </div>
                     <div class="card-subtitle text-muted mb-2" id="likes/${comment._id}">
                       Likes: ${comment.likes}  
                     </div>
-                    <div class="card-text mb-2">Respondiendo a ${comment.author} ${comment.content}</div>
-                    <a href="javascript:renderReply('${comment._id}')" class="btn me-2" style="background-color: #d1b3c4ff;">Responder</a>`;
+                    <div class="card-text mb-2" id="content/${comment._id}">${comment.isDeleted ? "Este comentario ha sido eliminado por su autor" : 'Respondiendo a' + comment.author + ' ' + comment.content}</div>`;
               
-              if (comment.isLiked){
-                html += `<a href="javascript:likeComment('${comment._id}')" class="btn" style="background-color: #ffd60a;" id="like-btn/${comment._id}">Me gusta</a>`;
-              } else {
-                html += `<a href="javascript:likeComment('${comment._id}')" class="btn" style="background-color: #b392acff;" id="like-btn/${comment._id}">Me gusta</a>`;
+              if (!comment.isDeleted){
+                html += `<a href="javascript:renderReply('${comment._id}')" class="btn" style="background-color: #d1b3c4ff;">Responder</a>\n`;
+              }
+              if (comment.isLiked && !comment.isDeleted){
+                html += `<a href="javascript:likeComment('${comment._id}')" class="btn" style="background-color: #ffd60a;" id="like-btn/${comment._id}">Me gusta</a>\n`;
+              } else if (!comment.isLiked && !comment.isDeleted){
+                html += `<a href="javascript:likeComment('${comment._id}')" class="btn" style="background-color: #b392acff;" id="like-btn/${comment._id}">Me gusta</a>\n`;
+              }
+
+              if (comment.amIauthor && !comment.isDeleted){
+                html += `<a href="javascript:renderEdit('${comment._id}')" class="link-secondary me-2" style="margin-left:100px;">Editar</a>
+                         <a href="javascript:deleteComment('${comment._id}')" class="link-danger">Eliminar</a>`;
               }
                     
-              html += `<div id="replybox/${comment._id}">
-                    </div>
+              html += `<div id="editbox/${comment._id}">
+                       </div>
+                       <div id="replybox/${comment._id}">
+                       </div>
 
                   </div>
                 </div>`;
@@ -403,6 +466,50 @@
             document.getElementById("like-btn/" + commentid).style = "background-color: #b392acff;";
           }
         }
+        http.open("POST", url);
+        http.send();
+      }
+
+      //Permite al autor editar un comentario de su autoría
+      function sendEdit(commentid){
+        const http = new XMLHttpRequest();
+        const url = "http://localhost:5500/editComment/" + commentid;
+        const newcomment = document.getElementById("editcomment/" + commentid).value;
+
+        http.onreadystatechange = function(){
+          if (this.readyState == 4 && this.status == 200){
+            cancelEdit(commentid);
+            const response = JSON.parse(this.response);  
+            if (response.isRoot){
+              refresComments();
+            } else {
+              viewReplies(response.rootComment)
+            }
+          }
+        }
+
+        http.open("POST", url);
+        http.setRequestHeader("Content-Type", "application/json;charset=UTF-8");
+        http.send(JSON.stringify({newcomment: newcomment}));
+      }
+
+      //Permite al autor eliminar un comentario de su autoría
+      function deleteComment(commentid){
+        console.log("aqiu")
+        const http = new XMLHttpRequest();
+        const url = "http://localhost:5500/deleteComment/" + commentid;
+
+        http.onreadystatechange = function(){
+          if (this.readyState == 4 && this.status == 200){
+            const response = JSON.parse(this.response);  
+            if (response.isRoot){
+              refresComments();
+            } else {
+              viewReplies(response.rootComment)
+            }
+          }
+        }
+
         http.open("POST", url);
         http.send();
       }
