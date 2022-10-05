@@ -20,13 +20,16 @@
                 <a class="nav-link text-white" href="/home">Menú principal</a>
               </li>
               <li class="nav-item me-4">
+                <a class="nav-link text-white" href="/subscriptions">Suscripciones</a>
+              </li>
+              <li class="nav-item me-4">
                 <a class="nav-link text-white" href="/newarticle">Crer artículo</a>
               </li>
               <li class="nav-item me-4">
-                <a class="nav-link text-white" href="/userarticles">Mis artículos</a>
+                <a class="nav-link text-white" href="/userlikes">Artículos favoritos</a>
               </li>
               <li class="nav-item me-4">
-                <a class="nav-link text-white" href="/userlikes">Artículos favoritos</a>
+                <a class="nav-link text-white" href="/userprofile">Mi perfil</a>
               </li>
             </ul>
             
@@ -47,7 +50,7 @@
                 Likes: <%= article.likes %> &nbsp&nbspDislikes: <%= article.dislikes %> &nbsp&nbspVistas: <%= article.views %>
             </div>
             <div class="text mb-4">
-              Autor: <%= author %>
+              Autor: <a href="/userprofile/<%=article.autor%>" class="link-secondary"><%= author %></a>
             </div>
             <div class="text-muted mb-4">
               Fecha de creación: <%= article.creationDate.toLocaleDateString() %>

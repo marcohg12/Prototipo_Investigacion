@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="en">
+
+    <head>
+        <meta charset="UTF-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.1/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-iYQeCzEYFbKjA/T2uDLTpkwGzCiq6soy8tYaI1GyVh/UjpbCx/TYkiZhlZB6+fzT" crossorigin="anonymous">
+        <title>Perfil de usuario</title>
+    </head>
+
+    <body>
+      
+      <nav class="navbar navbar-expand-lg" style="background-color: #735d78;">
+        <div class="container">
+          <div class="collapse navbar-collapse" id="navbarButtonsExample" >
+            
+            <ul class="navbar-nav me-auto mb-2 mb-lg-0 ">
+              <li class="nav-item me-4">
+                <a class="nav-link text-white" href="/home">Menú principal</a>
+              </li>
+              <li class="nav-item me-4">
+                <a class="nav-link text-white" href="/subscriptions">Suscripciones</a>
+              </li>
+              <li class="nav-item me-4">
+                <a class="nav-link text-white" href="/newarticle">Crer artículo</a>
+              </li>
+              <li class="nav-item me-4">
+                <a class="nav-link text-white" href="/userlikes">Artículos favoritos</a>
+              </li>
+              <li class="nav-item me-4">
+                <% if (amImyself) { %>
+                    <a class="nav-link text-white fw-bold" href="/userprofile">Mi perfil</a>
+                <% } else { %>
+                    <a class="nav-link text-white" href="/userprofile">Mi perfil</a>
+                <% } %> 
+              </li>
+            </ul>
+            
+            <form method="POST" action="/logout">
+              <div class="d-flex align-items-center">
+                <button type="submit" class="btn me-3" style="background-color: #ffd60a;">Cerrar sesión</button>
+              </div>
+            </form>
+          
+          </div>
+        </div>
+      </nav>
+      
+      <!--Aquí van los datos del usuario-->
+      <section class="mt-4">
+        <div class="container">
+
+            <h4 class="mb-4">
+                Nombre: <%= userData.name %>
+            </h4>
+            <h4 class="mb-4">
+                Nombre de usuario: <%= userData.username %>
+            </h4>
+            <h4 class="mb-4" id="subs">
+                Suscriptores: <%= userData.subscribers %>
+            </h4>
+
+            <% if (amImyself) { %>
+                <a href="/userStats" class="btn" style="background-color: #b392acff;">Estadísticas</a>
+            <% } else { %>
+                <% if (!locals.suscribed) { %>
+                    <a href="javascript:subscribe('<%=userData.username%>')" class="btn" style="background-color: #b392acff;" id="sub-btn">Suscribirse</a>
+                <% } else { %>
+                    <a href="javascript:subscribe('<%=userData.username%>')" class="btn" style="background-color: #ffd60a;" id="sub-btn">Suscrito</a>
+                <% } %>
+            <% } %>
+        </div>
+      </section>
+
+      <!--Aquí van los artículos del usuario-->
+      <section class="mt-4">
+        <div class="container">
+            <h4 class="text-muted mb-4">Artículos de <%=userData.name %></h4>
+
+            <% if (amImyself) { %>
+                <form method="POST" action="/searcharticlefromuser">
+            <% } else { %>
+                <form method="POST" action="/searcharticlefromuser/<%=userData.username%>">
+            <% } %>
+
+            <div class="input-group">
+                <input type="search" value="<%=locals.title%>" class="form-control rounded" placeholder="Buscar" aria-label="Search" aria-describedby="search-addon" name="title"/>
+                <button type="submit" class="btn" style=" border-color: #735d78; color: #735d78;">Buscar</button>
+            </div>
+            </form>
+
+            <div class="dropdown mt-2">
+                <button class="btn btn-secondary dropdown-toggle" type="button" id="book-dropdown" data-bs-toggle="dropdown" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                    Ordenar por
+                </button>
+                <ul class="dropdown-menu" aria-labelledby="book-dropdown">
+                    <li><a href="javascript:filter(1);" class="dropdown-item">Más reciente a más antiguo</a></li>
+                    <li><a href="javascript:filter(2);" class="dropdown-item">Más antiguo a más reciente</a></li>
+                    <li><a href="javascript:filter(3);" class="dropdown-item">Más vistos a menos vistos</a></li>
+                    <li><a href="javascript:filter(4);" class="dropdown-item">Menos vistos a más vistos</a></li>
+                    <li><a href="javascript:filter(5);" class="dropdown-item">Más gustados a menos gustados</a></li>
+                    <li><a href="javascript:filter(6);" class="dropdown-item">Menos gustados a más gustados</a></li>
+                </ul>
+            </div>
+
+        </div>
+      </section>
+      
+      <section class="mt-4 mb-4" id="content">
+        <div class="container">
+            <% articles.forEach(article => { %>
+              <div class="card mt-4">
+                <div class="card-body">
+                  <h4 class="card-title"><%= article.title %></h4>
+                  <div class="card-subtitle text-muted mb-2">
+                    <%= article.creationDate.toLocaleDateString()%>
+                  </div>
+                  <div class="card-subtitle text-muted mb-2">
+                    Likes: <%= article.likes %> &nbsp&nbspDislikes: <%= article.dislikes %> &nbsp&nbspVistas: <%= article.views %>
+                  </div>
+                  <div class="card-text mb-2"><%= article.description %></div>
+                  <a href="/viewarticle/<%= article.id %>" class="btn" style="background-color: #d1b3c4ff;">Ver más</a>
+                  <% if (amImyself) { %>
+                    <a href="/editarticle/<%= article.id %>" class="btn" style="background-color: #d1b3c4ff;">Editar</a>
+                    <a href="/stats/<%= article.id %>" class="btn" style="background-color: #b392acff;">Estadísticas</a>
+                  <% } %>
+                </div>
+              </div>
+            <% }) %>
+          </div>
+      </section>
+
+    </body>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.1/dist/js/bootstrap.bundle.min.js" integrity="sha384-u1OknCvxWvY5kfmNBILK2hRnQC3Pr17a+RTT6rIHI7NnikvbZlHgTPOOmMi466C8" crossorigin="anonymous"></script>
+    <script>
+        function filter(filter){
+            const articles = JSON.parse('<%-JSON.stringify(articles)%>');
+
+            //Filtro de más reciente a más antiguo
+            if (filter == 1){
+                articles.sort(function (a, b) {
+                    if (new Date(b.creationDate) > new Date(a.creationDate)) {
+                        return 1
+                    } if (new Date(b.creationDate) < new Date(a.creationDate)) {
+                        return -1
+                    }
+                    return 0;
+                });
+            }
+
+            //Filtro de más antiguo a más reciente
+            else if (filter == 2){
+                articles.sort(function (a, b) {
+                    if (new Date(a.creationDate) > new Date(b.creationDate)) {
+                        return 1
+                    } if (new Date(a.creationDate) < new Date(b.creationDate)) {
+                        return -1
+                    }
+                    return 0;
+                });
+            }
+
+            //Filtro de más vistos a menos vistos
+            else if (filter == 3){
+                articles.sort(function (a, b) {
+                    if (b.views > a.views) {
+                        return 1
+                    } if (b.views < a.views) {
+                        return -1
+                    }
+                    return 0;
+                });
+            }
+
+            //Filtro de menos vistos a más vistos
+            else if (filter == 4){
+                articles.sort(function (a, b) {
+                    if (a.views > b.views) {
+                        return 1
+                    } if (a.views < b.views) {
+                        return -1
+                    }
+                    return 0;
+                });
+            }
+
+            //Filtro de más gustados a menos gustados
+            else if (filter == 5){
+                articles.sort(function (a, b) {
+                    if (b.likes > a.likes) {
+                        return 1
+                    } if (b.likes < a.likes) {
+                        return -1
+                    }
+                    return 0;
+                });
+            }
+
+            //Filtro de menos gustados a más gustados
+            else if (filter == 6){
+                articles.sort(function (a, b) {
+                    if (a.likes > b.likes) {
+                        return 1
+                    } if (a.likes < b.likes) {
+                        return -1
+                    }
+                    return 0;
+                });
+            }
+            var html = '<div class="container">';
+            var amIauthor = "<%= amImyself %>";
+            articles.forEach(article => {
+                date = new Date(article.creationDate).toLocaleDateString();
+                html += ` <div class="card mt-4">
+                        <div class="card-body">
+                            <h4 class="card-title"> ${article.title} </h4>
+                            <div class="card-subtitle text-muted mb-2"> ${date} </div>
+                            <div class="card-text mb-2"> ${article.description} </div>
+                            <div class="card-subtitle text-muted mb-2">
+                                Likes: ${article.likes} &nbsp&nbspDislikes: ${article.dislikes} &nbsp&nbspVistas: ${article.views}
+                            </div>
+                            <a href="/viewarticle/${article._id}" class="btn" style="background-color: #d1b3c4ff;">Ver más</a>
+                            ${(amIauthor) ? `<a href="/editarticle/${article._id}" class="btn" style="background-color: #d1b3c4ff;">Editar</a>
+                                        <a href="/stats/${article._id}" class="btn" style="background-color: #b392acff;">Estadísticas</a>`:""}
+                        </div>
+                    </div> `;
+            });
+            html += '</div>';
+            document.getElementById("content").innerHTML = html;
+        }
+
+        function subscribe(username){
+            const http = new XMLHttpRequest();
+            const url = "http://localhost:5500/subscribe/" + username;
+
+            http.onreadystatechange = function() {
+
+                const response = this.response;
+
+                //El usuario se suscribió
+                if (this.readyState == 4 && this.status == 200){
+                    document.getElementById("sub-btn").innerHTML = `Suscrito`;
+                    document.getElementById("sub-btn").style = "background-color: #ffd60a;";
+                    document.getElementById("subs").innerHTML = `Suscriptores: ` + response;
+                }
+
+                //El usuario se desuscribió
+                else if (this.readyState == 4 && this.status == 210){
+                    document.getElementById("sub-btn").innerHTML = `Suscribirse`;
+                    document.getElementById("sub-btn").style = "background-color: #b392acff;";
+                    document.getElementById("subs").innerHTML = `Suscriptores: ` + response;
+                }
+            }
+
+            http.open("POST", url);
+            http.send();
+        }
+
+    </script>
+</html>

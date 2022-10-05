@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+
+    <head>
+        <meta charset="UTF-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.1/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-iYQeCzEYFbKjA/T2uDLTpkwGzCiq6soy8tYaI1GyVh/UjpbCx/TYkiZhlZB6+fzT" crossorigin="anonymous">
+        <script type="text/javascript" src="https://canvasjs.com/assets/script/canvasjs.min.js"></script>
+        <title>Estadísticas de usuario</title>
+    </head>
+
+    <body>
+      
+      <nav class="navbar navbar-expand-lg" style="background-color: #735d78;">
+        <div class="container">
+          <div class="collapse navbar-collapse" id="navbarButtonsExample" >
+            
+            <ul class="navbar-nav me-auto mb-2 mb-lg-0 ">
+              <li class="nav-item me-4">
+                <a class="nav-link text-white" href="/home">Menú principal</a>
+              </li>
+              <li class="nav-item me-4">
+                <a class="nav-link text-white" href="/subscriptions">Suscripciones</a>
+              </li>
+              <li class="nav-item me-4">
+                <a class="nav-link text-white" href="/newarticle">Crer artículo</a>
+              </li>
+              <li class="nav-item me-4">
+                <a class="nav-link text-white" href="/userlikes">Artículos favoritos</a>
+              </li>
+              <li class="nav-item me-4">
+                <a class="nav-link text-white" href="/userprofile">Mi perfil</a>
+              </li>
+            </ul>
+            
+            <form method="POST" action="/logout">
+              <div class="d-flex align-items-center">
+                <button type="submit" class="btn me-3" style="background-color: #ffd60a;">Cerrar sesión</button>
+              </div>
+            </form>
+          
+          </div>
+        </div>
+      </nav>
+
+      <section class="mt-4">
+
+        <div>
+          <h4 class="text-muted ms-4 mb-4">Estadísticas de <%=name%></h4>  
+        </div>
+        
+        <table class="table table-striped table-bordered ms-4" style="width:1470px">
+
+          <tbody>
+            <tr>
+              <th scope="row">Suscriptores</th>
+              <td><%=userStats.subs%></td>
+              <th scope="row">Artículos acumulados</th>
+              <td><%=userStats.articles%></td>
+            </tr>
+            <tr>
+              <th scope="row">Likes acumulados</th>
+              <td><%=userStats.likes%></td>
+              <th scope="row">Dislikes acumulados</th>
+              <td><%=userStats.dislikes%></td>
+            </tr>
+            <tr>
+              <th scope="row">Vistas acumuladas</th>
+              <td><%=userStats.views%></td>
+              <th scope="row">Comentarios acumulados</th>
+              <td><%=userStats.comments%></td>
+            </tr>
+          </tbody>
+
+        </table>
+      </section>
+
+      <section class="mt-4" id="content">
+        <div>
+          <h4 class="text-muted ms-4 mb-4">Suscriptores por tiempo</h4>  
+        </div>
+
+        <div id="chartContainer" style="height: 600px; width: 1400px; margin-left: 50px"></div>     
+      </section>
+
+      <section class="mt-4">
+        <a class="btn text-white mb-4" style="margin-left: 120px; margin-right: 30px; width:200px; background-color: #735d78;" id="lines">Líneas</a>
+        <a class="btn text-white mb-4" style="width:200px; margin-right: 30px; background-color: #735d78;" id="columns">Columnas</a>
+        <a class="btn mb-4" style="width:200px; background-color: #ffd60a;" href="/userprofile">Regresar</a>
+      </section>
+
+    </body>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.1/dist/js/bootstrap.bundle.min.js" integrity="sha384-u1OknCvxWvY5kfmNBILK2hRnQC3Pr17a+RTT6rIHI7NnikvbZlHgTPOOmMi466C8" crossorigin="anonymous"></script>
+    <script type="text/javascript">
+
+      //Preparación del formato de datos
+      var data = "<%=data%>".replace(/&#34;/ig,'"'); 
+      var subsData = JSON.parse(data);
+      for (let i = 0; i < subsData.length; i++){
+        let date = new Date(subsData[i].x);
+        subsData[i].x = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+      }
+
+
+      //Renderización del gráfico
+      var chart = new CanvasJS.Chart("chartContainer", {            
+        axisY: {title: "Suscriptores"},
+            
+        data: [{type: "line", dataPoints: subsData}]
+      });
+      chart.render();
+
+      var chartType = document.getElementById('lines');
+      chartType.addEventListener( "click",  function(){
+        chart.options.data[0].type = "line";
+        chart.render();
+      });
+
+      var chartType = document.getElementById('columns');
+      chartType.addEventListener( "click",  function(){
+        chart.options.data[0].type = "column";
+        chart.render();
+      });
+
+    </script>
+
+</html>

@@ -20,13 +20,16 @@
                 <a class="nav-link text-white" href="/home">Menú principal</a>
               </li>
               <li class="nav-item me-4">
+                <a class="nav-link text-white" href="/subscriptions">Suscripciones</a>
+              </li>
+              <li class="nav-item me-4">
                 <a class="nav-link text-white" href="/newarticle">Crer artículo</a>
               </li>
               <li class="nav-item me-4">
-                <a class="nav-link text-white" href="/userarticles">Mis artículos</a>
+                <a class="nav-link text-white" href="/userlikes">Artículos favoritos</a>
               </li>
               <li class="nav-item me-4">
-                <a class="nav-link text-white" href="/userlikes">Artículos favoritos</a>
+                <a class="nav-link text-white" href="/userprofile">Mi perfil</a>
               </li>
             </ul>
             
@@ -61,7 +64,8 @@
                   </div>
                 
                   <button type="submit" class="btn btn-dark btn-block me-2">Guardar</button>
-                  <a href="/deletearticle/<%=locals.articleid%>" class="btn btn-danger">Eliminar</a>
+                  <a href="/deletearticle/<%=locals.articleid%>" class="btn btn-danger me-2">Eliminar</a>
+                  <a class="btn" style="background-color: #ffd60a;" href="/viewarticle/<%= locals.articleid %>">Regresar</a>
             </form>
           </div>
 

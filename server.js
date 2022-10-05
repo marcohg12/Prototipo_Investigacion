@@ -11,6 +11,7 @@ const Comment = require("./Models/Comment");
 const bcrypt = require("bcrypt");
 const cors = require('cors')
 const bodyParser = require("body-parser");
+const schedule = require("node-schedule");
 
 //Creación y configuración del servidor
 const app = express();
@@ -75,6 +76,12 @@ initializePassport(passport, async (username) => {
         return null;
     }
 });
+
+//Job que actualiza el histórico de suscriptores de todos los autores
+const job = schedule.scheduleJob({hour: 0, minute: 0}, async function(){
+    await User.updateMany({},[{$set: {subsData: {$concatArrays: ["$subsData", [{x: Date.now(), y: "$subscribers"}]]}}}]);
+});
+
 //Funciones de servidor
 
 //Petición de vista de login
@@ -90,10 +97,79 @@ app.get("/register", checkNotAuthenticated, async (req, res) => {
 //Petición de vista del menú principal
 app.get("/home", checkAuthenticated, async (req, res) => {
     try {
-        const articles = await Article.find();
+        const articles = await Article.find().sort({creationDate: "desc"});
         return res.render("home", {articles: articles});
     } catch {
         return res.render("home", {articles: []});
+    }
+});
+
+//Petición de vista de suscripciones del usuario
+app.get("/subscriptions", checkAuthenticated, async (req, res) => {
+    try {
+        const user = await User.findOne({username: req.user.username});
+        const articles = await Article.find({autor: {$in: user.subscribedTo}}).sort({creationDate: "desc"});
+        return res.render("subsArticles", {articles: articles, subscriptions: user.subscribedTo});
+    }
+    catch {
+        return res.redirect("/home");
+    }
+});
+
+//Petición de estadísticas del usuario
+app.get("/userStats", checkAuthenticated, async (req, res) => {
+    try {
+        const user = await User.findOne({username: req.user.username});
+        const userStats = {subs: 0, articles: 0, likes: 0, dislikes: 0, views: 0, comments: 0}
+        const statData = await Article.aggregate([{$match: {autor: req.user.username}}, {$group: {_id: null,
+            views: {$sum: "$views"}, likes: {$sum: "$likes"}, dislikes: {$sum: "$dislikes"}, ids: {$addToSet: "$_id"}}},
+            {"$unset": ["_id"]}]);
+        const statsAv = statData.length > 0;
+        const commentCount = await Comment.count({$in: {article: statData.ids}});
+        const articleCount = await Article.count({autor: req.user.username});
+
+        userStats.subs = user.subscribers;
+        userStats.views = (statsAv) ? statData[0].views: 0;
+        userStats.likes = (statsAv) ? statData[0].likes: 0;
+        userStats.dislikes = (statsAv) ? statData[0].dislikes: 0;
+        userStats.articles = articleCount;
+        userStats.comments =  (statsAv) ? commentCount: 0;
+
+        return res.render("userStats", {data: JSON.stringify(user.subsData), userStats: userStats, name: titleCase(user.name)});
+    } catch (err) {
+        console.log(err)
+        return res.redirect("/home");
+    }
+});
+
+//Petición de ventana de perfil del usuario
+app.get("/userprofile", checkAuthenticated, async (req, res) => {
+    try {
+        var userData = await User.find({username: req.user.username});
+        userData[0].name = titleCase(userData[0].name);
+        const articles = await Article.find({autor: req.user.username});
+        return res.render("userProfile", {userData: userData[0], articles: articles, amImyself: true});
+
+    } catch {
+        return res.render("home", {articles: []});     
+    }
+});
+
+//Petición de ventana de perfil del usuario
+app.get("/userprofile/:id", checkAuthenticated, async (req, res) => {
+    try {
+        if (req.user.username == req.params.id){
+            return res.redirect("/userprofile");
+        }
+        var userData = await User.find({username: req.params.id});
+        userData[0].name = titleCase(userData[0].name);
+        const articles = await Article.find({autor: req.params.id});
+        const isSubscribed = await User.findOne({username: req.user.username, subscribedTo: {$in: [req.params.id]}});
+        var suscribed = (isSubscribed == null) ? false:true;
+        return res.render("userProfile", {userData: userData[0], articles: articles, amImyself: false, suscribed: suscribed});
+
+    } catch {
+        return res.render("home", {articles: []});     
     }
 });
 
@@ -242,7 +318,7 @@ app.get("/viewarticle/:id", checkAuthenticated, async (req, res) => {
             newComments.push(comment);
         }
 
-        return res.render("viewArticle", {article: article, comments: newComments, amIauthor: article.autor == req.user.username, isLiked: validation == 1, isDisliked: validation2 == 1, author: author.name});
+        return res.render("viewArticle", {article: article, comments: newComments, amIauthor: article.autor == req.user.username, isLiked: validation == 1, isDisliked: validation2 == 1, author: titleCase(author.name)});
     } catch {
         res.redirect("/home");
     }
@@ -268,6 +344,34 @@ app.post("/searcharticle", checkAuthenticated, async (req, res) => {
     }  
 });
 
+//Petición de artículos de un perfil de usuario con búsqueda
+app.post("/searcharticlefromuser/:id", checkAuthenticated, async (req, res) => {
+    try {
+        var userData = await User.find({username: req.params.id});
+        userData[0].name = titleCase(userData[0].name);
+        const articles = await Article.find({title: { $regex: req.body.title + '.*', $options: 'i'}, autor: req.params.id});
+        const isSubscribed = await User.findOne({username: req.user.username, subscribedTo: {$in: [req.params.id]}});
+        var suscribed = (isSubscribed == null) ? false:true;
+        return res.render("userProfile", {userData: userData[0], articles: articles, amImyself: false, title: req.body.title, suscribed: suscribed});
+
+    } catch {
+        return res.render("home", {articles: []});     
+    }
+});
+
+//Petición de artículos de un perfil de usuario con búsqueda
+app.post("/searcharticlefromuser", checkAuthenticated, async (req, res) => {
+    try {
+        var userData = await User.find({username: req.user.username});
+        userData[0].name = titleCase(userData[0].name);
+        const articles = await Article.find({title: { $regex: req.body.title + '.*', $options: 'i'}, autor: req.user.username});
+        return res.render("userProfile", {userData: userData[0], articles: articles, amImyself: true, title: req.body.title});
+
+    } catch {
+        return res.render("home", {articles: []});     
+    }
+});
+
 //Petición de artículos con likes con búsqueda
 app.post("/searchfavarticle", checkAuthenticated, async (req, res) => {
     try {
@@ -281,7 +385,7 @@ app.post("/searchfavarticle", checkAuthenticated, async (req, res) => {
 
 //Petición de registrar usuario
 app.post("/register", checkNotAuthenticated, async (req, res) => {
-    const name = req.body.name;
+    const name = titleCase(req.body.name);
     const username = (req.body.username).toLowerCase();
     const password = req.body.password;
     try {
@@ -530,6 +634,32 @@ app.post("/deleteComment/:id", checkAuthenticated, async (req, res) => {
     }
 });
 
+//Petición de suscribirse a un usuario
+app.post("/subscribe/:id", checkAuthenticated, async (req, res) => {
+    try {
+        const isSubscribed = await User.findOne({username: req.user.username, subscribedTo: {$in: [req.params.id]}});
+        const user = await User.findOne({username: req.params.id});
+        var subs;
+
+        //Si el usuario ya está suscrito, se desuscribe
+        if (isSubscribed){
+            await User.updateOne({username: req.user.username}, {$pull: {subscribedTo: req.params.id}});
+            await User.updateOne({username: req.params.id}, {$inc: {subscribers: -1}});
+            res.status(210);
+            subs = user.subscribers -1;
+        } else {
+            await User.updateOne({username: req.user.username}, {$push: {subscribedTo: req.params.id}});
+            await User.updateOne({username: req.params.id}, {$inc: {subscribers: 1}});
+            subs = user.subscribers +1;
+            res.status(200);
+        }
+        res.send(`${subs}`);
+    }
+    catch {
+        return res.redirect("/userprofile/" + req.params.id);
+    }
+});
+
 //Petición de inicio de sesión
 app.post("/home", checkNotAuthenticated, passport.authenticate("local", { 
     successRedirect: "/home", 
@@ -544,6 +674,12 @@ app.post("/logout", checkAuthenticated, async (req, res, next) =>{
         else {res.redirect("/");}
     });
 });
+
+//Formatea string para mostrar todas las letras minúsculas menos la primera letra de cada palabra
+function titleCase(str) {
+    return str.split(' ').map(item => 
+    item.charAt(0).toUpperCase() + item.slice(1).toLowerCase()).join(' ');
+}
 
 //Configuración de puerto
 app.listen(5500);
